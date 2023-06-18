@@ -12,3 +12,8 @@ RUN add-apt-repository -y ppa:oisf/suricata-stable
 
 RUN apt install -y suricata
 
+COPY ./suricata/ /etc/suricata/
+
+RUN suricata-update
+RUN suricata -T -c /etc/suricata/suricata.yaml -v
+RUN systemctl start suricata.service
