@@ -1,0 +1,57 @@
+version: '3.5'
+
+services:
+  ids:
+    container_name: ids
+    hostname: ids
+    build:
+      context: defense/ids/
+      dockerfile: Dockerfile
+    networks:
+      internal_network:
+        ipv4_address: 172.18.0.2
+      external_network:
+        ipv4_address: 172.19.0.2
+    cap_add:
+      - NET_ADMIN
+    command: tail -f /dev/null
+
+  vulnerable:
+    container_name: vulnerable
+    hostname: vulnerable
+    build:
+      context: defense/vulnerable/
+      dockerfile: Dockerfile
+    networks:
+      internal_network:
+        ipv4_address: 172.18.0.3
+    cap_add:
+      - NET_ADMIN
+
+    command: tail -f /dev/null
+
+  attacker:
+    container_name: attacker
+    hostname: attacker
+    build:
+      context: attacker/
+      dockerfile: Dockerfile
+    networks:
+      external_network:
+        ipv4_address: 172.19.0.3
+    cap_add:
+      - NET_ADMIN
+    command: tail -f /dev/null
+networks:
+  internal_network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.18.0.0/24
+
+  external_network:
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.19.0.0/24

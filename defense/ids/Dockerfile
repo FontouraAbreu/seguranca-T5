@@ -16,4 +16,5 @@ COPY ./suricata/ /etc/suricata/
 
 RUN suricata-update
 RUN suricata -T -c /etc/suricata/suricata.yaml -v
-RUN systemctl start suricata.service
+# use the service command
+CMD service suricata start
