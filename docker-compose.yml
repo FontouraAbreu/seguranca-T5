@@ -10,17 +10,18 @@ services:
     networks:
       internal_network:
         ipv4_address: 172.18.0.2
-      external_network:
-        ipv4_address: 172.19.0.2
     cap_add:
       - NET_ADMIN
     command: tail -f /dev/null
 
-  vulnerable:
-    container_name: vulnerable
-    hostname: vulnerable
+  scanner:
+    container_name: scanner
+    hostname: scanner
+    ports:
+      - "443:443"
+      - "9390:9390"
     build:
-      context: defense/vulnerable/
+      context: scanner/
       dockerfile: Dockerfile
     networks:
       internal_network:
@@ -28,20 +29,6 @@ services:
     cap_add:
       - NET_ADMIN
 
-    command: tail -f /dev/null
-
-  attacker:
-    container_name: attacker
-    hostname: attacker
-    build:
-      context: attacker/
-      dockerfile: Dockerfile
-    networks:
-      external_network:
-        ipv4_address: 172.19.0.3
-    cap_add:
-      - NET_ADMIN
-    command: tail -f /dev/null
 networks:
   internal_network:
     driver: bridge
@@ -49,9 +36,3 @@ networks:
       driver: default
       config:
         - subnet: 172.18.0.0/24
-
-  external_network:
-    ipam:
-      driver: default
-      config:
-        - subnet: 172.19.0.0/24
