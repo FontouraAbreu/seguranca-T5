@@ -71,3 +71,7 @@ O container com Suricata será o mesmo que será "atacado" pelo OpenVas, então 
 ### Ataque escolhido
 
 Por questão de viabilidade, iremos utilizar o `OpenSSH` como serviço vulnerável. A vulnerabilidade escolhida foi a `CVE-2020-15778` que explora uma falha no comando `scp` do `OpenSSH` que permite a execução de comandos arbitrários no servidor.
+
+Para garantir que o serviço estará vulnerável, iremos utilizar uma versão antiga do `OpenSSH` que possui a vulnerabilidade.######
+
+Para explorar essa vulnerabilidade, iremos utilizar o exploit disponível em `https://github.com/Neko-chanQwQ/CVE-2020-15778-Exploit` que foi desenvolvido em `Python`.
