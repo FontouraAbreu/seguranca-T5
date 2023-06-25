@@ -5,7 +5,7 @@ services:
     container_name: ids
     hostname: ids
     build:
-      context: defense/ids/
+      context: ids/
       dockerfile: Dockerfile
     networks:
       internal_network:
@@ -17,6 +17,8 @@ services:
   scanner:
     container_name: scanner
     hostname: scanner
+    volumes:
+      - data/:/var/lib/openvas/mgr/
     ports:
       - "443:443"
       - "9390:9390"

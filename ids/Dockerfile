@@ -24,3 +24,16 @@ COPY ./suricata/ /etc/suricata/
 # Atualizando regras a partir das regras locais
 RUN suricata-update
 RUN suricata -T -c /etc/suricata/suricata.yaml -v
+
+RUN service suricata start
+
+# Instalando pre-requisitos do openssh vulnerável
+RUN apt install -y \
+    libssl-dev \
+    gcc
+
+COPY ./install_vuln.sh /install_vuln.sh
+
+RUN chmod +x /install_vuln.sh
+
+# RUN /install_vuln.sh
