@@ -17,8 +17,6 @@ services:
   scanner:
     container_name: scanner
     hostname: scanner
-    volumes:
-      - data/:/var/lib/openvas/mgr/
     ports:
       - "443:443"
       - "9390:9390"

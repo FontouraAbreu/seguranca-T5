@@ -95,6 +95,36 @@ Para garantir que o serviço estará vulnerável, iremos utilizar uma versão an
 Vamos utilizar o `Dockerfile` do container com Suricata para instalar o `OpenSSH` e configurar o serviço.
 
 ```Dockerfile
-
+```
 
 Para explorar essa vulnerabilidade, iremos utilizar o exploit disponível em `https://github.com/Neko-chanQwQ/CVE-2020-15778-Exploit` que foi desenvolvido em `Python`.
+
+***
+
+## Como o ataque funciona
+
+A `CVE-2020-15778`  explora a falta de sanitização no comando `scp` do `OpenSSH`, em específico no caracter backtick. A manipulação do argumento de destino do comando `scp` permitindo a execução de comandos com privilégios incorretos na máquina de destino.
+
+Os mantenedores do `OpenSSH` reportaram que a falta de sanitização era intencional, visto que caso fosse feita a sanitização, a correção poderia quebrar **muitos** scripts que utilizam o comando `scp`.
+
+## Regra no Suricata para detectar o ataque
+
+## Pacotes do ataque
+
+## Alerta gerado pelo Suricata
+
+## Como executar
+
+Precisamos executar o `docker compose`:
+
+```bash
+docker compose up -d
+```
+
+Após alguns minutos os dois containers estarão rodando e o `OpenVas` estará atualizado. Para acessar o `OpenVas` basta acessar `https://localhost:443` e fazer login com o usuário `admin` e senha `admin`.
+
+Para executar o ataque, basta entrar no container `ids` e executar o script `exploit.sh`:
+
+```bash
+./exploit.sh
+```

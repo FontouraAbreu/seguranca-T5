@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM ubuntu:20.04
 
 # Instalando dependencias
 RUN apt update && apt install -y \
