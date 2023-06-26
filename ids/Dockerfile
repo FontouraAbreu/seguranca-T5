@@ -21,19 +21,31 @@ RUN apt install -y \
 # Utilizando uma configuração local, para facilitar a utilização
 COPY ./suricata/ /etc/suricata/
 
+# Copiando regra do scp
+COPY ./suricata/scp.rules /var/lib/suricata/rules/scp.rules
+
 # Atualizando regras a partir das regras locais
 RUN suricata-update
 RUN suricata -T -c /etc/suricata/suricata.yaml -v
 
-RUN service suricata start
-
 # Instalando pre-requisitos do openssh vulnerável
 RUN apt install -y \
     libssl-dev \
+    zlib1g-dev \
+    build-essential \
     gcc
 
+# Instalando openssh vulnerável
 COPY ./install_vuln.sh /install_vuln.sh
-
 RUN chmod +x /install_vuln.sh
+RUN /install_vuln.sh
+EXPOSE 22
 
-# RUN /install_vuln.sh
+
+# criando um usuario de exemplo
+RUN useradd -m -d /home/gregio -s /bin/bash gregio
+RUN echo 'gregio:gregio' | chpasswd
+
+COPY exploit.sh /exploit.sh
+
+RUN chmod +x /exploit.sh

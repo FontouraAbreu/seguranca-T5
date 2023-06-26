@@ -29,6 +29,17 @@ services:
     cap_add:
       - NET_ADMIN
 
+  vulnerable:
+    container_name: vulnerable
+    hostname: vulnerable
+    build:
+      context: vulnerable/
+      dockerfile: Dockerfile
+    networks:
+      internal_network:
+        ipv4_address: 172.18.0.4
+    command: tail -f /dev/null
+
 networks:
   internal_network:
     driver: bridge
