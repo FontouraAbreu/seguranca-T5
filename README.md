@@ -1,11 +1,18 @@
-# segurança-T5
-
-Iremos subir dois containers. Um rodando o `OpenVas` e outro com o `Suricata IDS`.
-O `OpenVas` irá escanear o container com o `Suricata` e a IDS irá detectar os Scans do `OpenVas`.
-
-***
+---
+title: "Trabalho 5 do curso de Segurança Computacional"
+author: Guiusepe Oneda, Vinicius Fontoura de Abreu, Arthur Vilar 
+date: GRR20210572, GRR20206873, GRR20197153
+---
 
 ## Introdução
+
+### Topologia da rede
+
+A topologia da rede é:
+
+![topologia](./topology.png)
+
+***
 
 ### Container com OpenVas
 
@@ -23,6 +30,9 @@ ENV COMMUNITY_SCAP_RSYNC_FEED=rsync://$FEED:/scap-data
 RUN greenbone-nvt-sync
 RUN greenbone-certdata-sync
 RUN greenbone-scapdata-sync
+RUN service openvas-scanner restart
+RUN service openvas-manager restart
+RUN service openvas-gsa restart
 ```
 
 Essa atualização é particularmente demorada, então é interessante que seja feita apenas uma vez, e que o container seja salvo como uma nova imagem.
@@ -44,7 +54,7 @@ Para utilizar o Suricata dentro de um container `Docker` iremos utilizar a image
 `Dockerfile` do container com Suricata:
 
 ```Dockerfile
-FROM ubuntu:latest
+FROM ubuntu:20.04
 
 # Instalando dependencias
 RUN apt update && apt install -y \
@@ -67,20 +77,35 @@ RUN apt install -y \
 # Utilizando uma configuração local, para facilitar a utilização
 COPY ./suricata/ /etc/suricata/
 
-# Atualizando regras a partir das regras locais
-RUN suricata-update
-RUN suricata -T -c /etc/suricata/suricata.yaml -v
+# Copiando regra do scp
+COPY ./suricata/rules/scp.rules /var/lib/suricata/rules/scp.rules
 
-RUN service suricata start
+# Instalando pre-requisitos do openssh vulnerável
+RUN apt install -y \
+    libssl-dev \
+    zlib1g-dev \
+    build-essential \
+    gcc
+
+# Instalando openssh vulnerável
+COPY ./install_vuln.sh /install_vuln.sh
+RUN chmod +x /install_vuln.sh
+RUN /install_vuln.sh
+EXPOSE 22
+
+
+# criando um usuario de exemplo
+RUN useradd -m -d /home/gregio -s /bin/bash gregio
+RUN echo 'gregio:gregio' | chpasswd
+
+COPY exploit.sh /exploit.sh
+
+RUN chmod +x /exploit.sh
 ```
 
-Após o container estar rodando, podemos acessar o container e rodar:
+O Dockerfile acima irá configurar o ambiente do Suricata e instalar o `OpenSSH` vulnerável.
 
-```bash
-suricata-update
-suricata -T -c /etc/suricata/suricata.yaml -v
-service suricata start
-```
+## Testando o Suricata
 
 enquanto observamos o log do Suricata:
 
@@ -102,17 +127,21 @@ Será possível ver o seguinte alerta:
 
 ***
 
-### Ataque escolhido
+## Ataque escolhido
 
 Por questão de viabilidade, iremos utilizar o `OpenSSH` como serviço vulnerável. A vulnerabilidade escolhida foi a `CVE-2020-15778` que explora uma falha no comando `scp` do `OpenSSH`. A vulnerabilidade permite a execução de comandos arbitrários no servidor.
 
 Para garantir que o serviço estará vulnerável, iremos utilizar a versão `8.3p1` do `OpenSSH` que possui a vulnerabilidade.
 
+A `CVE-2020-15778` explora a **falta de sanitização** no comando `scp` do `OpenSSH`, em específico no caracter **backtick**. A manipulação do argumento de destino do comando `scp` permitindo a execução de comandos com **privilégios incorretos** na máquina de destino.
+
+Os mantenedores do `OpenSSH` reportaram que a **falta de sanitização era intencional**, visto que caso fosse feita a sanitização, a correção poderia **quebrar muitos scripts** que utilizam o comando `scp`.
+
 ***
 
 ### Configurando a vulnerabilidade
 
-Vamos utilizar o um **script** no container com `Suricata` para instalar o `OpenSSH` e configurar o serviço.
+Vamos utilizar o um **script** no container com `Suricata` para instalar o `OpenSSH` vulnerável e configurar o serviço.
 
 ```bash
 # criando usuario sshd e pasta para privsep
@@ -133,21 +162,13 @@ make
 make install
 ```
 
-Para explorar essa vulnerabilidade, iremos utilizar o exploit disponível em `https://github.com/Neko-chanQwQ/CVE-2020-15778-Exploit` que foi desenvolvido em `Python`.
-
-***
-
-## Como o ataque funciona
-
-A `CVE-2020-15778` explora a **falta de sanitização** no comando `scp` do `OpenSSH`, em específico no caracter **backtick**. A manipulação do argumento de destino do comando `scp` permitindo a execução de comandos com **privilégios incorretos** na máquina de destino.
-
-Os mantenedores do `OpenSSH` reportaram que a **falta de sanitização era intencional**, visto que caso fosse feita a sanitização, a correção poderia **quebrar muitos scripts** que utilizam o comando `scp`.
+Dessa forma, o `OpenSSH` com a vulnerabiulidade, estará instalado e configurado para ser utilizado.
 
 ***
 
 ## Configurando Scan no OpenVas
 
-Por algum motivo o `OpenVas`, em algumas, desabilita o uso de scanners como o `Nmap`. Isso nos custou muito tempo de trabalho até descobrirmos que o `OpenVas` estava desabilitando o uso do `Nmap` por padrão. através desse post: <https://github.com/yu210148/gvm_install/issues/26>.
+Por algum motivo o `OpenVas`, em algumas versões e distribuições, desabilita o uso de scanners como o `Nmap` por padrão. Isso nos custou muito tempo de trabalho até descobrirmos que o `OpenVas` estava desabilitando o uso dos scanners de rede.
 
 Para habilitar o uso do `Nmap` no `OpenVas`, precisamos criar um scan customizado e habilitar o uso do `Nmap`. Para isso, precisamos acessar o `OpenVas` e ir em `Configuration` > `Scan Configs` > `New Scan Config` e criar um novo scan com o nome `Full and fast with Nmap`.
 
@@ -160,13 +181,13 @@ Referências para tentar resolver o problema:
 - <https://forum.greenbone.net/t/unable-to-get-required-output-while-scanning/9692>
 - <https://forum.greenbone.net/t/gsm-trial-not-finding-known-vulnerabilities-metasploitable/9654>
 
-## Pacotes do ataque
+Devido à esse problema, optamos por não gastar mais tempo tentando executar os scans do `OpenVas`. Entretanto configuramos o `Alvo`, o `Scan customizado` e a `Tarefa` para que o `OpenVas` possa ser utilizado.
 
 ***
 
 ## Como executar
 
-### Iniciando os serviços
+### Iniciando os containers
 
 Para iniciar os containers, precisamos executar o `docker compose`:
 
@@ -176,15 +197,9 @@ docker compose up -d
 
 Após alguns minutos os dois containers estarão rodando e o `OpenVas` estará atualizado. Para abrir o dashboard do `OpenVas` basta acessar `https://localhost:443` e fazer login com o usuário `admin` e senha `admin`.
 
-### Iniciando o `Suricata`
+***
 
-Para iniciar o `Suricata`, precisamos entrar no container `ids` e executar o comando:
-
-```bash
-service suricata start
-```
-
-### Iniciando o OpenSSH vulnerável
+### Iniciando o Suricata e o  OpenSSH vulnerável
 
 Para iniciar o `OpenSSH` vulnerável, precisamos entrar no container `ids` e executar o comando:
 
@@ -192,13 +207,17 @@ Para iniciar o `OpenSSH` vulnerável, precisamos entrar no container `ids` e exe
 /usr/local/sbin/sshd -D &
 ```
 
+Assim, o serviço `OpenSSH` estará rodando e pronto para ser explorado.
+
 ### Regra no Suricata para detectar o ataque
 
 Para permitir que o suricata detecte o ataque, vamos configurar uma nova regra em `/var/lib/suricata/rules/scp.rules`:
 
 ```bash
-echo "alert tcp any any -> any any (msg:"PROVAVEL COMANDO SCP MALICIOSO"; content:"SSH"; nocase; content:"`"; sid:9000002; rev:1;)" >> /var/lib/suricata/rules/scp.rules
+alert tcp any any -> any any (msg:"PROVAVEL COMANDO SCP MALICIOSO"; content:"SSH"; nocase; content:"`"; sid:9000002; rev:1;)
 ```
+
+Ela já foi carregada no `Suricata` na inicialização do container.
 
 Essa regra irá detectar o caracter **backtick** no comando `scp` e irá gerar um alerta.
 
@@ -209,10 +228,12 @@ rule-files:
   - scp.rules
 ```
 
-Agora, precisamos atualizar as regras do `Suricata`:
+Este também já foi configurado no container.
+
+Agora, basta atualizar as regras do `Suricata`:
 
 ```bash
-suricata-update && suricata -T -c /etc/suricata/suricata.yaml -v
+suricata-update
 ```
 
 Veremos algo como:
@@ -256,6 +277,13 @@ Veremos algo como:
 26/6/2023 -- 13:32:20 - <Info> -- Writing rules to /var/lib/suricata/rules/suricata.rules: total: 43347; enabled: 34519; added: 0; removed 0; modified: 0
 26/6/2023 -- 13:32:20 - <Info> -- Writing /var/lib/suricata/rules/classification.config
 26/6/2023 -- 13:32:20 - <Info> -- No changes detected, exiting.
+```
+
+Após isso, as regras do `Suricata` foram atualizadas com base em fontes da verdade confiáveis.
+
+Agora, basta testarmos as regras atualizadas com o comando `suricata -T -c /etc/suricata/suricata.yaml -v`. O resultado deve ser parecido com o seguinte:
+
+```bash
 26/6/2023 -- 13:33:34 - <Info> - Running suricata under test mode
 26/6/2023 -- 13:33:34 - <Notice> - This is Suricata version 6.0.13 RELEASE running in SYSTEM mode
 26/6/2023 -- 13:33:34 - <Info> - CPUs/cores online: 16
@@ -270,7 +298,7 @@ Veremos algo como:
 26/6/2023 -- 13:33:43 - <Info> - cleaning up signature grouping structure... complete
 ```
 
-Dessa forma, o Suricata irá detectar qualquer comando `scp` que contenha o char `backtick`.
+Assim, o Suricata irá detectar qualquer comando `scp` que contenha o char `backtick`.
 
 ### Testando a nova regra
 
@@ -280,7 +308,7 @@ Podemos testar a nova regra utilizando o comando `scp`, enquanto observamos o lo
 tail -f /var/log/suricata/fast.log
 ```
 
-rodando:
+rodando, a partir de outra máquina, o comando:
 
 ```bash
 touch teste
@@ -325,3 +353,65 @@ As informações mais cruciais que conseguimos extrair são os IPs envolvidos no
 - 172.18.0.3:48152 (Cliente)
 - 172.18.0.2:22 (Suricata)
 e que a versão do `OpenSSH` utilizada foi `SSH-2.0-OpenSSH_8.3`
+
+***
+
+## Replicando o ataque do Pcap
+
+### Preparação
+
+Para replicar o ataque do `Pcap` disponibilizado na prova, vamos utilizar o `tcpreplay`, porém, precisamos ajustar o `MTU` (Maximum Transmission Unit) do arquivo pcap para evitar problemas de fragmentação como `Unable to send packet: Error with PF_PACKET send() [2148]: Message too long (errno = 90)`. Para isso, vamos utilizar o `tcprewrite`:
+
+```bash
+tcprewrite --mtu=8000 --mtu-trunc --skip-soft-errors -i malware.pcap -o malware.pcap
+```
+
+substituindo assim o pcap original pelo novo pcap com o `MTU` ajustado.
+
+Precisamos também, editar o endereço local contido no `pcap` para um endereço local da nossa rede. Vamos, novamente, utilizar o tcprewrite:
+
+```bash
+tcprewrite --srcipmap=192.168.122.150:172.18.0.5 --dstipmap=192.168.122.150:172.18.0.5 -i /tmp/malware.pcap -o /tmp/malware.pcap
+```
+
+Isso vai evitar que o `Suricata` tenha problemas na detecção do ataque.
+
+### Regra de detecção do ataque
+
+No `pcap` utilizado a vitima acessa o site `www.mkgastro.com.pl` e faz um `GET Request` no arquivo `/framework/Atube.zip` que contém um malware. Para detectarmos esse ataque, vamos utilizar as seguintes regras:
+
+```bash
+alert http any any -> any any (msg:"ALERTA - ACESSO NO SITE www.mkgastro.com.pl"; http.host; content:"www.mkgastro.com.pl"; sid:1000001; rev:1;)
+
+alert tcp any any -> any any (msg:"ALERTA - ACESSO AO ARQUIVO www.mkgastro.com.pl/framework/Atube.zip"; content:"GET"; uricontent:"/framework/Atube.zip"; sid:1000002; rev:1;)
+```
+
+A primeira, busca detectar o acesso ao site. Já a segunda, detecta o `GET request` no arquivo malicioso.
+
+Não, podemos esquecer de atualizar as regras do suricata como fizemos antes:
+
+```bash
+suricata -T -c /etc/suricata/suricata.yaml -v
+```
+
+***
+
+### Simulando o ataque
+
+Enquanto observamos os logs com `tail -f /var/log/suricata/fast.log` vamos utilizar o `tcpreplay` para replicar o ataque:
+
+```bash
+tcpreplay -i eth0 -l 0 malware.pcap
+```
+
+Poderemos observar os alertas no log do Suricata:
+
+```bash
+06/26/2023-23:38:29.223378  [**] [1:2008512:19] ET HUNTING Suspicious User-Agent (C slash) [**] [Classification: A Network Trojan was detected] [Priority: 1] {TCP} 172.18.0.5:65191 -> 185.135.88.187:80
+06/26/2023-23:38:29.223378  [**] [1:1000001:1] ALERTA - ACESSO NO SITE www.mkgastro.com.pl [**] [Classification: (null)] [Priority: 3] {TCP} 172.18.0.5:65191 -> 185.135.88.187:80
+06/26/2023-23:38:29.223378  [**] [1:1000002:1] ALERTA - ACESSO AO ARQUIVO www.mkgastro.com.pl/framework/Atube.zip [**] [Classification: (null)] [Priority: 3] {TCP} 172.18.0.5:65191 -> 185.135.88.187:80
+06/26/2023-23:38:29.223378  [**] [1:2210026:2] SURICATA STREAM ESTABLISHED SYN resend [**] [Classification: Generic Protocol Command Decode] [Priority: 3] {TCP} 172.18.0.5:65191 -> 185.135.88.187:80
+06/26/2023-23:38:30.501199  [**] [1:2210023:2] SURICATA STREAM ESTABLISHED SYNACK resend with different ACK [**] [Classification: Generic Protocol Command Decode] [Priority: 3] {TCP} 185.135.88.187:80 -> 172.18.0.5:65191
+```
+
+Todos os alertas acima são especificos do tráfego do `pcap`. Podemos ver os alertas que criamos acima e também alguns alertas do `Suricata` logou sobre o tráfego.
