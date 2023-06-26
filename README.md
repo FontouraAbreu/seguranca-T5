@@ -27,6 +27,14 @@ RUN greenbone-scapdata-sync
 
 Essa atualização é particularmente demorada, então é interessante que seja feita apenas uma vez, e que o container seja salvo como uma nova imagem.
 
+depois que o container estiver rodando, devemos acessar o container e rodar:
+
+```bash
+openvasmd --rebuild --progress
+```
+
+Isso irá atualizar o banco de dados do `OpenVas` e é necessário para que o `OpenVas` funcione corretamente.
+
 ***
 
 ### Container com Suricata
@@ -66,6 +74,14 @@ RUN suricata -T -c /etc/suricata/suricata.yaml -v
 RUN service suricata start
 ```
 
+Após o container estar rodando, podemos acessar o container e rodar:
+
+```bash
+suricata-update
+suricata -T -c /etc/suricata/suricata.yaml -v
+service suricata start
+```
+
 enquanto observamos o log do Suricata:
 
 ```bash
@@ -85,18 +101,6 @@ Será possível ver o seguinte alerta:
 ```
 
 ***
-
-## Scans do OpenVas
-
-Para realizar os scans do `OpenVas` através da interface web, iremos setar um `Alvo` no `OpenVas` com o IP do container com o `Suricata` e depois iremos configurar uma `Task` que ira realizar o scan conforme configurado.
-
-Iremos configurar 3 `Tasks` diferentes, uma para cada tipo de scan:
-
-- Full and fast
-- Full and very deep
-- CVE scan
-
-Com o objetivo de testar a eficácia do `Suricata` e também para testar a eficácia do `OpenVas` em detectar vulnerabilidades.
 
 ### Ataque escolhido
 
@@ -141,51 +145,22 @@ Os mantenedores do `OpenSSH` reportaram que a **falta de sanitização era inten
 
 ***
 
-## Regra no Suricata para detectar o ataque
-
-Para permitir que o suricata detecte o ataque, vamos configurar uma nova regra em `/etc/suricata/rules/scp.rules`:
-
-```bash
-echo "alert tcp any any -> any any (msg:"SCP Command Detected"; flow:to_server,established; content:"scp"; nocase; sid:1000001; rev:1;)" >> /etc/suricata/rules/scp.rules
-```
-
-Além disso, precisamos atualizar o arquivo `/etc/suricata/suricata.yaml` para que o Suricata utilize a nova regra:
-
-```yaml
-rule-files:
-  - /etc/suricata/rules/scp.rules
-```
-
-Dessa forma, o Suricata irá detectar qualquer comando `scp` que for executado.
-
-### Testando a nova regra
-
-Podemos testar a nova regra utilizando o comando `scp`, enquanto observamos o log do Suricata:
-
-```bash
-tail -f /var/log/suricata/fast.log
-```
-
-rodando:
-
-```bash
-touch teste
-scp teste gregio@172.18.0.2:/tmp/teste
-```
-
-***
-
 ## Configurando Scan no OpenVas
 
-### Scan específico para a vulnerabilidade
+Por algum motivo o `OpenVas`, em algumas, desabilita o uso de scanners como o `Nmap`. Isso nos custou muito tempo de trabalho até descobrirmos que o `OpenVas` estava desabilitando o uso do `Nmap` por padrão. através desse post: <https://github.com/yu210148/gvm_install/issues/26>.
 
-***
+Para habilitar o uso do `Nmap` no `OpenVas`, precisamos criar um scan customizado e habilitar o uso do `Nmap`. Para isso, precisamos acessar o `OpenVas` e ir em `Configuration` > `Scan Configs` > `New Scan Config` e criar um novo scan com o nome `Full and fast with Nmap`.
+
+De toda forma, mesmo criando um scan customizado, o `OpenVas` não consegue usar o `Nmap` para realizar o scan. Algumas horas foram gastas tentando resolver esse problema, desde reinstalar o `OpenVas` em outra distro, até tentar compilar o `Nmap` dentro do container do `OpenVas`.
+
+Referências para tentar resolver o problema:
+
+- <https://openvas-discuss.openvas.narkive.com/dSeOP4P3/openvas-not-invoking-nmap-how-to-fix>
+- <https://github.com/yu210148/gvm_install/issues/26>
+- <https://forum.greenbone.net/t/unable-to-get-required-output-while-scanning/9692>
+- <https://forum.greenbone.net/t/gsm-trial-not-finding-known-vulnerabilities-metasploitable/9654>
 
 ## Pacotes do ataque
-
-***
-
-## Alerta gerado pelo Suricata
 
 ***
 
@@ -217,8 +192,136 @@ Para iniciar o `OpenSSH` vulnerável, precisamos entrar no container `ids` e exe
 /usr/local/sbin/sshd -D &
 ```
 
-Para executar o ataque, basta entrar no container `ids` e executar o script `exploit.sh`:
+### Regra no Suricata para detectar o ataque
+
+Para permitir que o suricata detecte o ataque, vamos configurar uma nova regra em `/var/lib/suricata/rules/scp.rules`:
 
 ```bash
-./exploit.sh
+echo "alert tcp any any -> any any (msg:"PROVAVEL COMANDO SCP MALICIOSO"; content:"SSH"; nocase; content:"`"; sid:9000002; rev:1;)" >> /var/lib/suricata/rules/scp.rules
 ```
+
+Essa regra irá detectar o caracter **backtick** no comando `scp` e irá gerar um alerta.
+
+Além disso, precisamos atualizar o arquivo `/etc/suricata/suricata.yaml` para que o Suricata utilize a nova regra:
+
+```yaml
+rule-files:
+  - scp.rules
+```
+
+Agora, precisamos atualizar as regras do `Suricata`:
+
+```bash
+suricata-update && suricata -T -c /etc/suricata/suricata.yaml -v
+```
+
+Veremos algo como:
+  
+```bash
+26/6/2023 -- 13:32:17 - <Info> -- Using data-directory /var/lib/suricata.
+26/6/2023 -- 13:32:17 - <Info> -- Using Suricata configuration /etc/suricata/suricata.yaml
+26/6/2023 -- 13:32:17 - <Info> -- Using /etc/suricata/rules for Suricata provided rules.
+26/6/2023 -- 13:32:17 - <Info> -- Found Suricata version 6.0.13 at /usr/bin/suricata.
+26/6/2023 -- 13:32:17 - <Info> -- Loading /etc/suricata/suricata.yaml
+26/6/2023 -- 13:32:17 - <Info> -- Disabling rules for protocol http2
+26/6/2023 -- 13:32:17 - <Info> -- Disabling rules for protocol modbus
+26/6/2023 -- 13:32:17 - <Info> -- Disabling rules for protocol dnp3
+26/6/2023 -- 13:32:17 - <Info> -- Disabling rules for protocol enip
+26/6/2023 -- 13:32:17 - <Info> -- No sources configured, will use Emerging Threats Open
+26/6/2023 -- 13:32:17 - <Info> -- Last download less than 15 minutes ago. Not downloading https://rules.emergingthreats.net/open/suricata-6.0.13/emerging.rules.tar.gz.
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/app-layer-events.rules
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/decoder-events.rules
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/dhcp-events.rules
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/dnp3-events.rules
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/dns-events.rules
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/files.rules
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/http-events.rules
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/ipsec-events.rules
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/kerberos-events.rules
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/modbus-events.rules
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/nfs-events.rules
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/ntp-events.rules
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/smb-events.rules
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/smtp-events.rules
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/stream-events.rules
+26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/tls-events.rules
+26/6/2023 -- 13:32:17 - <Info> -- Ignoring file rules/emerging-deleted.rules
+26/6/2023 -- 13:32:18 - <Info> -- Loaded 43347 rules.
+26/6/2023 -- 13:32:18 - <Info> -- Disabled 14 rules.
+26/6/2023 -- 13:32:18 - <Info> -- Enabled 0 rules.
+26/6/2023 -- 13:32:18 - <Info> -- Modified 0 rules.
+26/6/2023 -- 13:32:18 - <Info> -- Dropped 0 rules.
+26/6/2023 -- 13:32:18 - <Info> -- Enabled 131 rules for flowbit dependencies.
+26/6/2023 -- 13:32:18 - <Info> -- Backing up current rules.
+26/6/2023 -- 13:32:20 - <Info> -- Writing rules to /var/lib/suricata/rules/suricata.rules: total: 43347; enabled: 34519; added: 0; removed 0; modified: 0
+26/6/2023 -- 13:32:20 - <Info> -- Writing /var/lib/suricata/rules/classification.config
+26/6/2023 -- 13:32:20 - <Info> -- No changes detected, exiting.
+26/6/2023 -- 13:33:34 - <Info> - Running suricata under test mode
+26/6/2023 -- 13:33:34 - <Notice> - This is Suricata version 6.0.13 RELEASE running in SYSTEM mode
+26/6/2023 -- 13:33:34 - <Info> - CPUs/cores online: 16
+26/6/2023 -- 13:33:34 - <Info> - Setting engine mode to IDS mode by default
+26/6/2023 -- 13:33:34 - <Info> - fast output device (regular) initialized: fast.log
+26/6/2023 -- 13:33:34 - <Info> - eve-log output device (regular) initialized: eve.json
+26/6/2023 -- 13:33:34 - <Info> - stats output device (regular) initialized: stats.log
+26/6/2023 -- 13:33:38 - <Info> - 2 rule files processed. 34520 rules successfully loaded, 0 rules failed
+26/6/2023 -- 13:33:38 - <Info> - Threshold config parsed: 0 rule(s) found
+26/6/2023 -- 13:33:38 - <Info> - 34523 signatures processed. 1280 are IP-only rules, 5230 are inspecting packet payload, 27806 inspect application layer, 108 are decoder event only
+26/6/2023 -- 13:33:43 - <Notice> - Configuration provided was successfully loaded. Exiting.
+26/6/2023 -- 13:33:43 - <Info> - cleaning up signature grouping structure... complete
+```
+
+Dessa forma, o Suricata irá detectar qualquer comando `scp` que contenha o char `backtick`.
+
+### Testando a nova regra
+
+Podemos testar a nova regra utilizando o comando `scp`, enquanto observamos o log do Suricata:
+
+```bash
+tail -f /var/log/suricata/fast.log
+```
+
+rodando:
+
+```bash
+touch teste
+scp teste gregio@172.18.0.2:'`touch /home/gregio/hacked`/home/gregio/teste'
+```
+
+Veremos o alerta no log:
+
+```bash
+06/26/2023-13:57:20.978293  [**] [1:9000002:1] PROVAVEL COMANDO SCP MALICIOSO [**] [Classification: (null)] [Priority: 3] {TCP} 172.18.0.2:22 -> 172.18.0.3:38676
+```
+
+e o arquivo no caminho `/home/gregio/hacked` será criado no container do `Suricata`.
+
+***
+
+### Capturando os pacotes do ataque
+
+Para capturarmos os pacotes do comando `scp` malicioso e salvá-los em um arquivo `pcap`, vamos utilizar o `tcpdump`:
+  
+```bash
+tcpdump -i eth0 -s 0 -w capture.pcap 'tcp port 22 and (tcp[tcpflags] & tcp-push != 0)'
+$ tcpdump: listening on eth0, link-type EN10MB (Ethernet), capture size 262144 bytes
+```
+
+após rodar o comando `scp` malicioso, veremos:
+
+```bash
+29 packets captured
+29 packets received by filter
+0 packets dropped by kernel
+```
+
+Vamos salvar o arquivo `pcap` em um volume e analisá-lo com o `Wireshark`
+
+### Analisando os pacotes capturados
+
+Infelizmente não conseguimos extrair o comando `scp` malicioso do arquivo `pcap` gerado, pois o `tcpdump` não captura o payload dos pacotes.
+
+As informações mais cruciais que conseguimos extrair são os IPs envolvidos no ataque:
+
+- 172.18.0.3:48152 (Cliente)
+- 172.18.0.2:22 (Suricata)
+e que a versão do `OpenSSH` utilizada foi `SSH-2.0-OpenSSH_8.3`

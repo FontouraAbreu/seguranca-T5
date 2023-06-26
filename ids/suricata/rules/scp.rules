@@ -1,1 +1,1 @@
-alert tcp any any <> any any (msg:"PROVAVEL COMANDO SCP MALICIOSO"; content:"SCP"; nocase; content:"`"; sid:9000002; rev:1;)
+alert tcp any any -> any any (msg:"PROVAVEL COMANDO SCP MALICIOSO"; content:"SSH"; nocase; content:"`"; sid:9000002; rev:1;)
