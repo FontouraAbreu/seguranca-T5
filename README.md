@@ -13,6 +13,7 @@ A topologia da rede é:
 ![topologia](./topology.png)
 
 Os detalhes de cada máquina serão descritos a seguir.
+
 ***
 
 ### Container com OpenVas
