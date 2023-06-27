@@ -1,6 +1,6 @@
 ---
 title: "Trabalho 5 do curso de Segurança Computacional"
-author: Guiusepe Oneda, Vinicius Fontoura de Abreu, Arthur Vilar 
+author: Guiusepe Oneda, Vinicius Fontoura, Arthur Vilar 
 date: GRR20210572, GRR20206873, GRR20197153
 ---
 
@@ -12,6 +12,7 @@ A topologia da rede é:
 
 ![topologia](./topology.png)
 
+Os detalhes de cada máquina serão descritos a seguir.
 ***
 
 ### Container com OpenVas
@@ -107,7 +108,7 @@ O Dockerfile acima irá configurar o ambiente do Suricata e instalar o `OpenSSH`
 
 ## Testando o Suricata
 
-enquanto observamos o log do Suricata:
+Enquanto observamos o log do Suricata:
 
 ```bash
 tail -f /var/log/suricata/fast.log
@@ -122,10 +123,17 @@ curl http://testmynids.org/uid/index.html
 Será possível ver o seguinte alerta:
 
 ```bash
-06/24/2023-17:03:41.271088  [**] [1:2100498:7] GPL ATTACK_RESPONSE id check returned root [**] [Classification: Potentially Bad Traffic] [Priority: 2] {TCP} 65.8.214.24:80 -> 172.18.0.2:42414
+06/24/2023-17:03:41.271088  [**] 
+[1:2100498:7] GPL ATTACK_RESPONSE id check returned root [**]
+[Classification: Potentially Bad Traffic] [Priority: 2] 
+{TCP} 65.8.214.24:80 -> 172.18.0.2:42414
 ```
 
 ***
+
+### Container com metasploit
+
+Utilizaremos a imagem `tleemcjr/metasploitable2` para subir um container vulnerável que será alvo dos scans do `OpenVas`.
 
 ## Ataque escolhido
 
@@ -151,12 +159,14 @@ chown -R root:sys /var/lib/sshd/
 useradd -r -U -d /var/lib/sshd/ -c "sshd privsep" -s /bin/false sshd
 
 # baixando o openssh
-wget https://openbsd.c3sl.ufpr.br/pub/OpenBSD/OpenSSH/portable/openssh-8.3p1.tar.gz
+wget https://openbsd.c3sl.ufpr.br/pub/OpenBSD/OpenSSH/portable/
+openssh-8.3p1.tar.gz
 
 # descompactando e instalando
 tar -xvf openssh-8.3p1.tar.gz
 cd openssh-8.3p1
-./configure --with-md5-passwords --with-privsep-path=/var/lib/sshd/ --sysconfdir=/etc/ssh 
+./configure --with-md5-passwords --with-privsep-path=/var/lib/sshd/
+ --sysconfdir=/etc/ssh 
 
 make
 make install
@@ -213,8 +223,9 @@ Assim, o serviço `OpenSSH` estará rodando e pronto para ser explorado.
 
 Para permitir que o suricata detecte o ataque, vamos configurar uma nova regra em `/var/lib/suricata/rules/scp.rules`:
 
-```bash
-alert tcp any any -> any any (msg:"PROVAVEL COMANDO SCP MALICIOSO"; content:"SSH"; nocase; content:"`"; sid:9000002; rev:1;)
+```text
+alert tcp any any -> any any (msg:"PROVAVEL COMANDO SCP MALICIOSO";
+content:"SSH"; nocase; content:"`"; sid:9000002; rev:1;)
 ```
 
 Ela já foi carregada no `Suricata` na inicialização do container.
@@ -238,64 +249,86 @@ suricata-update
 
 Veremos algo como:
   
-```bash
-26/6/2023 -- 13:32:17 - <Info> -- Using data-directory /var/lib/suricata.
-26/6/2023 -- 13:32:17 - <Info> -- Using Suricata configuration /etc/suricata/suricata.yaml
-26/6/2023 -- 13:32:17 - <Info> -- Using /etc/suricata/rules for Suricata provided rules.
-26/6/2023 -- 13:32:17 - <Info> -- Found Suricata version 6.0.13 at /usr/bin/suricata.
-26/6/2023 -- 13:32:17 - <Info> -- Loading /etc/suricata/suricata.yaml
-26/6/2023 -- 13:32:17 - <Info> -- Disabling rules for protocol http2
-26/6/2023 -- 13:32:17 - <Info> -- Disabling rules for protocol modbus
-26/6/2023 -- 13:32:17 - <Info> -- Disabling rules for protocol dnp3
-26/6/2023 -- 13:32:17 - <Info> -- Disabling rules for protocol enip
-26/6/2023 -- 13:32:17 - <Info> -- No sources configured, will use Emerging Threats Open
-26/6/2023 -- 13:32:17 - <Info> -- Last download less than 15 minutes ago. Not downloading https://rules.emergingthreats.net/open/suricata-6.0.13/emerging.rules.tar.gz.
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/app-layer-events.rules
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/decoder-events.rules
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/dhcp-events.rules
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/dnp3-events.rules
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/dns-events.rules
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/files.rules
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/http-events.rules
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/ipsec-events.rules
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/kerberos-events.rules
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/modbus-events.rules
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/nfs-events.rules
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/ntp-events.rules
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/smb-events.rules
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/smtp-events.rules
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/stream-events.rules
-26/6/2023 -- 13:32:17 - <Info> -- Loading distribution rule file /etc/suricata/rules/tls-events.rules
-26/6/2023 -- 13:32:17 - <Info> -- Ignoring file rules/emerging-deleted.rules
-26/6/2023 -- 13:32:18 - <Info> -- Loaded 43347 rules.
-26/6/2023 -- 13:32:18 - <Info> -- Disabled 14 rules.
-26/6/2023 -- 13:32:18 - <Info> -- Enabled 0 rules.
-26/6/2023 -- 13:32:18 - <Info> -- Modified 0 rules.
-26/6/2023 -- 13:32:18 - <Info> -- Dropped 0 rules.
-26/6/2023 -- 13:32:18 - <Info> -- Enabled 131 rules for flowbit dependencies.
-26/6/2023 -- 13:32:18 - <Info> -- Backing up current rules.
-26/6/2023 -- 13:32:20 - <Info> -- Writing rules to /var/lib/suricata/rules/suricata.rules: total: 43347; enabled: 34519; added: 0; removed 0; modified: 0
-26/6/2023 -- 13:32:20 - <Info> -- Writing /var/lib/suricata/rules/classification.config
-26/6/2023 -- 13:32:20 - <Info> -- No changes detected, exiting.
+```text
+13:32:17 - <Info> -- Using data-directory /var/lib/suricata.
+13:32:17 - <Info> -- Using Suricata configuration /etc/suricata/suricata.yaml
+13:32:17 - <Info> -- Using /etc/suricata/rules for Suricata provided rules.
+13:32:17 - <Info> -- Found Suricata version 6.0.13 at /usr/bin/suricata.
+13:32:17 - <Info> -- Loading /etc/suricata/suricata.yaml
+13:32:17 - <Info> -- Disabling rules for protocol http2
+13:32:17 - <Info> -- Disabling rules for protocol modbus
+13:32:17 - <Info> -- Disabling rules for protocol dnp3
+13:32:17 - <Info> -- Disabling rules for protocol enip
+13:32:17 - <Info> -- No sources configured, will use Emerging Threats Open
+13:32:17 - <Info> -- Last download less than 15 minutes ago. Not downloading
+
+https://rules.emergingthreats.net/open/suricata-6.0.13/emerging.rules.tar.gz.
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/app-layer-events.rules
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/decoder-events.rules
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/dhcp-events.rules
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/dnp3-events.rules
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/dns-events.rules
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/files.rules
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/http-events.rules
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/ipsec-events.rules
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/kerberos-events.rules
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/modbus-events.rules
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/nfs-events.rules
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/ntp-events.rules
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/smb-events.rules
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/smtp-events.rules
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/stream-events.rules
+13:32:17 - <Info> -- Loading distribution rule file
+ /etc/suricata/rules/tls-events.rules
+13:32:17 - <Info> -- Ignoring file rules/emerging-deleted.rules
+13:32:18 - <Info> -- Loaded 43347 rules.
+13:32:18 - <Info> -- Disabled 14 rules.
+13:32:18 - <Info> -- Enabled 0 rules.
+13:32:18 - <Info> -- Modified 0 rules.
+13:32:18 - <Info> -- Dropped 0 rules.
+13:32:18 - <Info> -- Enabled 131 rules for flowbit dependencies.
+13:32:18 - <Info> -- Backing up current rules.
+13:32:20 - <Info> -- Writing rules to /var/lib/suricata/rules/suricata.rules:
+ total: 43347; enabled: 34519; added: 0; removed 0; modified: 0
+13:32:20 - <Info> -- Writing /var/lib/suricata/rules/classification.config
+13:32:20 - <Info> -- No changes detected, exiting.
 ```
 
 Após isso, as regras do `Suricata` foram atualizadas com base em fontes da verdade confiáveis.
 
 Agora, basta testarmos as regras atualizadas com o comando `suricata -T -c /etc/suricata/suricata.yaml -v`. O resultado deve ser parecido com o seguinte:
 
-```bash
-26/6/2023 -- 13:33:34 - <Info> - Running suricata under test mode
-26/6/2023 -- 13:33:34 - <Notice> - This is Suricata version 6.0.13 RELEASE running in SYSTEM mode
-26/6/2023 -- 13:33:34 - <Info> - CPUs/cores online: 16
-26/6/2023 -- 13:33:34 - <Info> - Setting engine mode to IDS mode by default
-26/6/2023 -- 13:33:34 - <Info> - fast output device (regular) initialized: fast.log
-26/6/2023 -- 13:33:34 - <Info> - eve-log output device (regular) initialized: eve.json
-26/6/2023 -- 13:33:34 - <Info> - stats output device (regular) initialized: stats.log
-26/6/2023 -- 13:33:38 - <Info> - 2 rule files processed. 34520 rules successfully loaded, 0 rules failed
-26/6/2023 -- 13:33:38 - <Info> - Threshold config parsed: 0 rule(s) found
-26/6/2023 -- 13:33:38 - <Info> - 34523 signatures processed. 1280 are IP-only rules, 5230 are inspecting packet payload, 27806 inspect application layer, 108 are decoder event only
-26/6/2023 -- 13:33:43 - <Notice> - Configuration provided was successfully loaded. Exiting.
-26/6/2023 -- 13:33:43 - <Info> - cleaning up signature grouping structure... complete
+```text
+13:33:34 - <Info> - Running suricata under test mode
+13:33:34 - <Notice> - This is Suricata version 6.0.13 RELEASE running in SYSTEM mode
+13:33:34 - <Info> - CPUs/cores online: 16
+13:33:34 - <Info> - Setting engine mode to IDS mode by default
+13:33:34 - <Info> - fast output device (regular) initialized: fast.log
+13:33:34 - <Info> - eve-log output device (regular) initialized: eve.json
+13:33:34 - <Info> - stats output device (regular) initialized: stats.log
+13:33:38 - <Info> - 2 rule files processed. 34520 rules successfully loaded
+ , 0 rules failed
+13:33:38 - <Info> - Threshold config parsed: 0 rule(s) found
+13:33:38 - <Info> - 34523 signatures processed. 1280 are IP-only rules, 5230 are
+inspecting packet payload, 27806 inspect application layer,
+ 108 are decoder event only
+13:33:43 - <Notice> - Configuration provided was successfully loaded. Exiting.
+13:33:43 - <Info> - cleaning up signature grouping structure... complete
 ```
 
 Assim, o Suricata irá detectar qualquer comando `scp` que contenha o char `backtick`.
@@ -317,8 +350,9 @@ scp teste gregio@172.18.0.2:'`touch /home/gregio/hacked`/home/gregio/teste'
 
 Veremos o alerta no log:
 
-```bash
-06/26/2023-13:57:20.978293  [**] [1:9000002:1] PROVAVEL COMANDO SCP MALICIOSO [**] [Classification: (null)] [Priority: 3] {TCP} 172.18.0.2:22 -> 172.18.0.3:38676
+```text
+06/26/2023-13:57:20.978293  [**] [1:9000002:1] PROVAVEL COMANDO SCP MALICIOSO [**]
+[Classification: (null)] [Priority: 3] {TCP} 172.18.0.2:22 -> 172.18.0.3:38676
 ```
 
 e o arquivo no caminho `/home/gregio/hacked` será criado no container do `Suricata`.
@@ -329,14 +363,16 @@ e o arquivo no caminho `/home/gregio/hacked` será criado no container do `Suric
 
 Para capturarmos os pacotes do comando `scp` malicioso e salvá-los em um arquivo `pcap`, vamos utilizar o `tcpdump`:
   
-```bash
-tcpdump -i eth0 -s 0 -w capture.pcap 'tcp port 22 and (tcp[tcpflags] & tcp-push != 0)'
-$ tcpdump: listening on eth0, link-type EN10MB (Ethernet), capture size 262144 bytes
+```text
+tcpdump -i eth0 -s 0 -w capture.pcap 'tcp port 22 and
+(tcp[tcpflags] & tcp-push != 0)'
+$ tcpdump: listening on eth0, link-type EN10MB
+(Ethernet), capture size 262144 bytes
 ```
 
 após rodar o comando `scp` malicioso, veremos:
 
-```bash
+```text
 29 packets captured
 29 packets received by filter
 0 packets dropped by kernel
@@ -358,12 +394,15 @@ e que a versão do `OpenSSH` utilizada foi `SSH-2.0-OpenSSH_8.3`
 
 ## Replicando o ataque do Pcap
 
+O `Pcap` escolhido tem a hash `9537dbe46db02b1c0361ac292269288d` e foi originalmente escolhido como prova para o aluno Guiusepe. Ele contém aproximadamente `5000 pacotes` que foram enviados ao longo de 24 segundos, onde o ataque malicioso ocorre logo no início, tratando-se de um `GET` que instala um malware do tipo `banloader` na máquina alvo. Tudo isso com o site malicioso camuflado em um portal de gastronomia, e o nome do arquivo como um conhecido software de download de vídeos
+
 ### Preparação
 
 Para replicar o ataque do `Pcap` disponibilizado na prova, vamos utilizar o `tcpreplay`, porém, precisamos ajustar o `MTU` (Maximum Transmission Unit) do arquivo pcap para evitar problemas de fragmentação como `Unable to send packet: Error with PF_PACKET send() [2148]: Message too long (errno = 90)`. Para isso, vamos utilizar o `tcprewrite`:
 
 ```bash
-tcprewrite --mtu=8000 --mtu-trunc --skip-soft-errors -i malware.pcap -o malware.pcap
+tcprewrite --mtu=8000 --mtu-trunc --skip-soft-errors
+-i malware.pcap -o malware.pcap
 ```
 
 substituindo assim o pcap original pelo novo pcap com o `MTU` ajustado.
@@ -371,7 +410,9 @@ substituindo assim o pcap original pelo novo pcap com o `MTU` ajustado.
 Precisamos também, editar o endereço local contido no `pcap` para um endereço local da nossa rede. Vamos, novamente, utilizar o tcprewrite:
 
 ```bash
-tcprewrite --srcipmap=192.168.122.150:172.18.0.5 --dstipmap=192.168.122.150:172.18.0.5 -i /tmp/malware.pcap -o /tmp/malware.pcap
+tcprewrite --srcipmap=192.168.122.150:172.18.0.5
+--dstipmap=192.168.122.150:172.18.0.5 -i /tmp/malware.pcap
+-o /tmp/malware.pcap
 ```
 
 Isso vai evitar que o `Suricata` tenha problemas na detecção do ataque.
@@ -381,9 +422,12 @@ Isso vai evitar que o `Suricata` tenha problemas na detecção do ataque.
 No `pcap` utilizado a vitima acessa o site `www.mkgastro.com.pl` e faz um `GET Request` no arquivo `/framework/Atube.zip` que contém um malware. Para detectarmos esse ataque, vamos utilizar as seguintes regras:
 
 ```bash
-alert http any any -> any any (msg:"ALERTA - ACESSO NO SITE www.mkgastro.com.pl"; http.host; content:"www.mkgastro.com.pl"; sid:1000001; rev:1;)
+alert http any any -> any any (msg:"ALERTA - ACESSO NO SITE www.mkgastro.com.pl";
+http.host; content:"www.mkgastro.com.pl"; sid:1000001; rev:1;)
 
-alert tcp any any -> any any (msg:"ALERTA - ACESSO AO ARQUIVO www.mkgastro.com.pl/framework/Atube.zip"; content:"GET"; uricontent:"/framework/Atube.zip"; sid:1000002; rev:1;)
+alert tcp any any -> any any (msg:"ALERTA - ACESSO AO ARQUIVO
+www.mkgastro.com.pl/framework/Atube.zip"; content:"GET";
+uricontent:"/framework/Atube.zip"; sid:1000002; rev:1;)
 ```
 
 A primeira, busca detectar o acesso ao site. Já a segunda, detecta o `GET request` no arquivo malicioso.
@@ -406,12 +450,29 @@ tcpreplay -i eth0 -l 0 malware.pcap
 
 Poderemos observar os alertas no log do Suricata:
 
-```bash
-06/26/2023-23:38:29.223378  [**] [1:2008512:19] ET HUNTING Suspicious User-Agent (C slash) [**] [Classification: A Network Trojan was detected] [Priority: 1] {TCP} 172.18.0.5:65191 -> 185.135.88.187:80
-06/26/2023-23:38:29.223378  [**] [1:1000001:1] ALERTA - ACESSO NO SITE www.mkgastro.com.pl [**] [Classification: (null)] [Priority: 3] {TCP} 172.18.0.5:65191 -> 185.135.88.187:80
-06/26/2023-23:38:29.223378  [**] [1:1000002:1] ALERTA - ACESSO AO ARQUIVO www.mkgastro.com.pl/framework/Atube.zip [**] [Classification: (null)] [Priority: 3] {TCP} 172.18.0.5:65191 -> 185.135.88.187:80
-06/26/2023-23:38:29.223378  [**] [1:2210026:2] SURICATA STREAM ESTABLISHED SYN resend [**] [Classification: Generic Protocol Command Decode] [Priority: 3] {TCP} 172.18.0.5:65191 -> 185.135.88.187:80
-06/26/2023-23:38:30.501199  [**] [1:2210023:2] SURICATA STREAM ESTABLISHED SYNACK resend with different ACK [**] [Classification: Generic Protocol Command Decode] [Priority: 3] {TCP} 185.135.88.187:80 -> 172.18.0.5:65191
+```text
+23:38:29.223378  [**] [1:2008512:19] ET HUNTING Suspicious User-Agent (C slash) [**]
+ [Classification: A Network Trojan was detected] [Priority: 1] 
+ {TCP} 172.18.0.5:65191 -> 185.135.88.187:80
+23:38:29.223378  [**] [1:1000001:1] ALERTA - ACESSO NO SITE www.mkgastro.com.pl [**]
+ [Classification: (null)] [Priority: 3] 
+ {TCP} 172.18.0.5:65191 -> 185.135.88.187:80
+23:38:29.223378  [**] [1:1000002:1] ALERTA - ACESSO AO ARQUIVO
+ www.mkgastro.com.pl/framework/Atube.zip [**]
+ [Classification: (null)] [Priority: 3] 
+ {TCP} 172.18.0.5:65191 -> 185.135.88.187:80
+23:38:29.223378  [**] [1:2210026:2] SURICATA STREAM ESTABLISHED SYN resend [**]
+ [Classification: Generic Protocol Command Decode] [Priority: 3] 
+ {TCP} 172.18.0.5:65191 -> 185.135.88.187:80
+23:38:30.501199  [**] [1:2210023:2] SURICATA STREAM ESTABLISHED SYNACK
+ resend with different ACK [**]
+ [Classification: Generic Protocol Command Decode] [Priority: 3] 
+ {TCP} 185.135.88.187:80 -> 172.18.0.5:65191
 ```
 
 Todos os alertas acima são especificos do tráfego do `pcap`. Podemos ver os alertas que criamos acima e também alguns alertas do `Suricata` logou sobre o tráfego.
+
+## Conclusão
+
+Conseguimos capturar tanto uma vulnerabilidade específica quanto o tráfego malicioso através do arquivo `pcap` da prova.
+Infelizmente não conseguimos scannear a máquina vulnerável usando o `OpenVas` mas conseguimos instala-lá, acessar sua interface web e configurar os scans e alvos.
