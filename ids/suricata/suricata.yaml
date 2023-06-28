@@ -1945,6 +1945,7 @@ default-rule-path: /var/lib/suricata/rules
 rule-files:
   - suricata.rules
   - scp.rules
+  - pcap.rules
 
 ##
 ## Auxiliary configuration files.
