@@ -403,7 +403,7 @@ Para replicar o ataque do `Pcap` disponibilizado na prova, vamos utilizar o `tcp
 
 ```bash
 tcprewrite --mtu=8000 --mtu-trunc --skip-soft-errors
--i malware.pcap -o malware.pcap
+-i /tmp/malware.pcap -o malware.pcap
 ```
 
 substituindo assim o pcap original pelo novo pcap com o `MTU` ajustado.
@@ -412,8 +412,8 @@ Precisamos também, editar o endereço local contido no `pcap` para um endereço
 
 ```bash
 tcprewrite --srcipmap=192.168.122.150:172.18.0.5
---dstipmap=192.168.122.150:172.18.0.5 -i /tmp/malware.pcap
--o /tmp/malware.pcap
+--dstipmap=192.168.122.150:172.18.0.5 -i malware.pcap
+-o malware.pcap
 ```
 
 Isso vai evitar que o `Suricata` tenha problemas na detecção do ataque.
@@ -436,6 +436,8 @@ A primeira, busca detectar o acesso ao site. Já a segunda, detecta o `GET reque
 Não, podemos esquecer de atualizar as regras do suricata como fizemos antes:
 
 ```bash
+service suricata restart
+suricata-update
 suricata -T -c /etc/suricata/suricata.yaml -v
 ```
 
