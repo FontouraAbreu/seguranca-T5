@@ -408,6 +408,12 @@ tcprewrite --mtu=8000 --mtu-trunc --skip-soft-errors
 
 substituindo assim o pcap original pelo novo pcap com o `MTU` ajustado.
 
+Além disso, precisamos atualizar o MTU da interface de rede do container do `Suricata` para evitar problemas de fragmentação:
+
+```bash
+ifconfig eth0 mtu 9216
+```
+
 Precisamos também, editar o endereço local contido no `pcap` para um endereço local da nossa rede. Vamos, novamente, utilizar o tcprewrite:
 
 ```bash

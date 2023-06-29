@@ -23,6 +23,8 @@ COPY ./suricata/ /etc/suricata/
 
 # Copiando regra do scp
 COPY ./suricata/rules/scp.rules /var/lib/suricata/rules/scp.rules
+COPY ./suricata/rules/pcap.rules /var/lib/suricata/rules/pcap.rules
+
 
 # Instalando pre-requisitos do openssh vulnerável
 RUN apt install -y \
