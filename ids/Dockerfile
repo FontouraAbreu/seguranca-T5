@@ -44,7 +44,3 @@ EXPOSE 22
 # criando um usuario de exemplo
 RUN useradd -m -d /home/gregio -s /bin/bash gregio
 RUN echo 'gregio:gregio' | chpasswd
-
-COPY exploit.sh /exploit.sh
-
-RUN chmod +x /exploit.sh
