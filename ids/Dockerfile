@@ -31,7 +31,8 @@ RUN apt install -y \
     libssl-dev \
     zlib1g-dev \
     build-essential \
-    gcc
+    gcc \
+    tcpreplay
 
 # Instalando openssh vulnerável
 COPY ./install_vuln.sh /install_vuln.sh
